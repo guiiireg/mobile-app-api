@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'localization.dart';
+import 'main.dart' show CoverImage;
 import 'translation_service.dart';
 
 class DetailPage extends StatefulWidget {
@@ -35,7 +36,9 @@ class _DetailPageState extends State<DetailPage> {
   void didUpdateWidget(DetailPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.language != widget.language) {
-      _loadTranslation();
+      setState(() {
+        _loadTranslation();
+      });
     }
   }
 
@@ -53,7 +56,7 @@ class _DetailPageState extends State<DetailPage> {
             Padding(
               padding: const EdgeInsets.all(10),
               child: Text(
-                widget.anime['title']['romaji'],
+                widget.anime['title']?['romaji'] ?? AppLocalizations.translate('no_title', widget.language),
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -108,49 +111,6 @@ class _DetailPageState extends State<DetailPage> {
 
   Widget _buildCoverImage() {
     final imageUrl = widget.anime['coverImage']?['large'] as String?;
-    
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return Container(
-        width: double.infinity,
-        height: 250,
-        color: Colors.grey[300],
-        child: const Center(
-          child: Icon(Icons.image_not_supported, size: 50),
-        ),
-      );
-    }
-
-    return Image.network(
-      imageUrl,
-      width: double.infinity,
-      height: 250,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          width: double.infinity,
-          height: 250,
-          color: Colors.grey[300],
-          child: const Center(
-            child: Icon(Icons.broken_image, size: 50),
-          ),
-        );
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          width: double.infinity,
-          height: 250,
-          color: Colors.grey[200],
-          child: Center(
-            child: CircularProgressIndicator(
-              value: loadingProgress.expectedTotalBytes != null
-                  ? loadingProgress.cumulativeBytesLoaded /
-                      loadingProgress.expectedTotalBytes!
-                  : null,
-            ),
-          ),
-        );
-      },
-    );
+    return CoverImage(imageUrl: imageUrl, height: 250);
   }
 }

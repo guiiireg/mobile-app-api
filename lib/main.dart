@@ -8,6 +8,64 @@ void main() {
   runApp(const MyApp());
 }
 
+/// Reusable widget that loads a network image with a spinner and error fallback.
+class CoverImage extends StatelessWidget {
+  final String? imageUrl;
+  final double height;
+  final double? progressValue;
+
+  const CoverImage({
+    super.key,
+    required this.imageUrl,
+    this.height = 150,
+    this.progressValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl == null || imageUrl!.isEmpty) {
+      return _placeholder(Icons.image_not_supported);
+    }
+
+    return Image.network(
+      imageUrl!,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) =>
+          _placeholder(Icons.broken_image),
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        final value = loadingProgress.expectedTotalBytes != null
+            ? loadingProgress.cumulativeBytesLoaded /
+                loadingProgress.expectedTotalBytes!
+            : null;
+        return Container(
+          height: height,
+          width: double.infinity,
+          color: Colors.grey[200],
+          child: Center(
+            child: SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(strokeWidth: 2, value: value),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _placeholder(IconData icon) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      color: Colors.grey[300],
+      child: Center(child: Icon(icon, size: height > 200 ? 50 : 24)),
+    );
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -29,6 +87,7 @@ class CataloguePage extends StatefulWidget {
 class _CataloguePageState extends State<CataloguePage> {
   late Future<List<dynamic>> animeList;
   String currentLanguage = 'fr';
+  final Map<String, Future<String>> _descriptionFutures = {};
 
   @override
   void initState() {
@@ -39,6 +98,7 @@ class _CataloguePageState extends State<CataloguePage> {
   void _changeLanguage(String language) {
     setState(() {
       currentLanguage = language;
+      _descriptionFutures.clear();
     });
   }
 
@@ -148,7 +208,7 @@ class _CataloguePageState extends State<CataloguePage> {
                       ),
                       Padding(
                         padding: const EdgeInsets.all(5),
-                        child: _buildDescriptionPreview(item),
+                        child: _buildDescriptionPreview(item, index),
                       ),
                     ],
                   ),
@@ -161,17 +221,20 @@ class _CataloguePageState extends State<CataloguePage> {
     );
   }
 
-  Widget _buildDescriptionPreview(dynamic item) {
-    final description = item['description'] ?? "";
-    
+  Widget _buildDescriptionPreview(dynamic item, int index) {
+    final rawDescription = ApiService.stripHtmlTags(item['description'] ?? '');
+    final key = '$index-$currentLanguage';
+
+    _descriptionFutures[key] ??= TranslationService.translate(
+      rawDescription,
+      currentLanguage,
+    );
+
     return FutureBuilder<String>(
-      future: TranslationService.translate(
-        ApiService.stripHtmlTags(description),
-        currentLanguage,
-      ),
+      future: _descriptionFutures[key],
       builder: (context, snapshot) {
-        final displayText = snapshot.data ?? ApiService.stripHtmlTags(description);
-        
+        final displayText = snapshot.data ?? rawDescription;
+
         return Text(
           displayText,
           maxLines: 2,
@@ -184,48 +247,6 @@ class _CataloguePageState extends State<CataloguePage> {
 
   Widget _buildGridImage(dynamic item) {
     final imageUrl = item['coverImage']?['large'] as String?;
-    
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return Container(
-        height: 150,
-        width: double.infinity,
-        color: Colors.grey[300],
-        child: const Center(
-          child: Icon(Icons.image_not_supported),
-        ),
-      );
-    }
-
-    return Image.network(
-      imageUrl,
-      height: 150,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Container(
-          height: 150,
-          width: double.infinity,
-          color: Colors.grey[300],
-          child: const Center(
-            child: Icon(Icons.broken_image),
-          ),
-        );
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return Container(
-          height: 150,
-          width: double.infinity,
-          color: Colors.grey[200],
-          child: const Center(
-            child: SizedBox(
-              width: 30,
-              height: 30,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        );
-      },
-    );
+    return CoverImage(imageUrl: imageUrl, height: 150);
   }
 }
